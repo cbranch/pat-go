@@ -5,11 +5,15 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/hex"
+	"encoding/base64"
 	"math/big"
 	"testing"
 
 	"github.com/cloudflare/circl/blindsign/blindrsa"
 	"github.com/cloudflare/pat-go/tokens"
+
+	"golang.org/x/crypto/cryptobyte"
+	"golang.org/x/crypto/cryptobyte/asn1"
 )
 
 func mustDecodeHex(h string) []byte {
@@ -99,6 +103,54 @@ func TestTypeDA7AIssuanceRoundTrip(t *testing.T) {
 	}
 
 	token, err := requestState.FinalizeToken(blindedSignature)
+	if err != nil {
+		t.Error(err)
+	}
+
+	verifier := blindrsa.NewRandomizedPBRSAVerifier(tokenPublicKey, crypto.SHA384)
+	err = verifier.Verify(token.AuthenticatorInput(), encodedExtensions, token.Authenticator)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestTypeDA7ARedemption(t *testing.T) {
+	pkenc, err := base64.URLEncoding.DecodeString("MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQMEAgKiAwIBMAOCAQ8AMIIBCgKCAQEAsWbGbh4DVsYf8lhGclpqEEfHvhrX0QWoIvXRnua8KhuUOKZ-VPlJ0iFchIS7lq9qyr50nshbN5SUN_Q21alOQ0jgg1qfm4cAWWqh9t9JUkIgOQv3Zbu-hLBxXrVjwlK7rgVkB_Q8FZ7q70nCWwDeZRxWdHuEBXY1mCndR9Ckcn3dYAvepiyrdlJpLZHVL11yE314Y4RQ7xO7OU9Rp2WJjZY_DAcn_XZuCTZaQG2urthXOWtc3-gPGEqARmIoY5v5ndfhq-OPbg47Ug__n4isYGx4Y5YiubeUz34puHb_64cPN06HPgUsoCt66LcNv31UXtNMXUC0p0JS43xssHe8PQIDAQAB")
+	if err != nil {
+		t.Error(err)
+	}
+	// ParsePKIXPublicKey doesn't recognise RSA-PSS. Grab the RSA public key from the DER bytes.
+	der := cryptobyte.String(pkenc[72:])
+	N := new(big.Int)
+	var E int
+	if !der.ReadASN1(&der, asn1.SEQUENCE) {
+		t.Errorf("x509: invalid RSA public key")
+	}
+	if !der.ReadASN1Integer(N) {
+		t.Errorf("x509: invalid RSA modulus")
+	}
+	if !der.ReadASN1Integer(&E) {
+		t.Errorf("x509: invalid RSA public exponent")
+	}
+	if N.Sign() <= 0 {
+		t.Errorf("x509: RSA modulus is not a positive number")
+	}
+	if E <= 0 {
+		t.Errorf("x509: RSA public exponent is not a positive number")
+	}
+	tokenPublicKey := &rsa.PublicKey{
+		E: E,
+		N: N,
+	}
+	tokenenc, err := base64.StdEncoding.DecodeString("2noDXlY+g9s/QmzTqOMa4igPcZlyuIRwbT195e+vUnCLj0nnQ5lbEppk9BxKLNrjkbyJPuzGLys5eH0oNmX+lDi9IqG9dUfoKQvLn2dUGfSwB4Rbc7v0Zg4+BhDTSgdkOEs8LrE86X6DL4/GDikP1GweDN0IV+BfGr7lqSBluKo9Z4D3Y8c/1d6ew8O7JCXxIpos8rZGo3Sv3wM3FQaaBhFFNgT50g8S3nD0mMs1PTLB88Jkx+PBWSaMEr6sDhY/sDi3DHySbrJqFM1E3KPZzSUxO4oGz70/huBK4xXyeb7/r9Qe53AODRTcXncOYzIKwuDthyYqtjmcwOrJkHM3hfFgQrtbAYmVhrBYHuEUCH7Ybdref2hUlGfHZIlUJD+ESywO8xHo637d+egwUDrUDadwu//KnrzqhRsFlhoiY75H8m6+IDQHOaqBb5QodgwN6Pdsnra4vkUDZCneKqeJpW2U")
+	if err != nil {
+		t.Error(err)
+	}
+	encodedExtensions, err := base64.StdEncoding.DecodeString("ACgAAQAQAAAAAAAAA4QAAAAAZR3OzAACAAYABFVTLCzwAQABAfACAAEA")
+	if err != nil {
+		t.Error(err)
+	}
+	token, err := UnmarshalToken(tokenenc)
 	if err != nil {
 		t.Error(err)
 	}
