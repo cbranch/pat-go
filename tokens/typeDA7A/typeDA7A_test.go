@@ -162,6 +162,32 @@ func TestTypeDA7ARedemption(t *testing.T) {
 	}
 }
 
+func TestTypeDA7ARedemption2(t *testing.T) {
+	NEnc := "d6930820f71fe517bf3259d14d40209b02a5c0d3d61991c731dd7da39f8d69821552e2318d6c9ad897e603887a476ea3162c1205da9ac96f02edf31df049bd55f142134c17d4382a0e78e275345f165fbe8e49cdca6cf5c726c599dd39e09e75e0f330a33121e73976e4facba9cfa001c28b7c96f8134f9981db6750b43a41710f51da4240fe03106c12acb1e7bb53d75ec7256da3fddd0718b89c365410fce61bc7c99b115fb4c3c318081fa7e1b65a37774e8e50c96e8ce2b2cc6b3b367982366a2bf9924c4bafdb3ff5e722258ab705c76d43e5f1f121b984814e98ea2b2b8725cd9bc905c0bc3d75c2a8db70a7153213c39ae371b2b5dc1dafcb19d6fae9"
+	tokenPublicKey := &rsa.PublicKey{
+		E: 65537,
+		N: new(big.Int).SetBytes(mustDecodeHex(NEnc)),
+	}
+	tokenenc, err := base64.URLEncoding.DecodeString("2npXtWHfPZDmExf3PzSiwGJIWMAIIHzh2lwRT2epnzm21AAh4_zP8-F12r3vWG-v27JvwKhp7inQIptZJyn6axKJEBdfDShVl4Qf_c74_17WwuXJWVO8PGReAGx1fz16oVkM5dPCl7DMCl7dczsVIw70nXNImxyL2N_m0Q0-WjV7ygwOcfw4sFj6Ze_BwJmVElqIbhZ540GVbcwCPG2v_I21_1xcvaJ_tM4ojZeC8xtj-JyZek5o1uTtT6os3j_-d-DpqVTL6eEIpb7guvrG3Jp0LcO7GTQl1wc7366mwNcIskR8Kv7nJr-ZK7e9TLY2mzKSVP195n9Qay6W_qENrZ1UJTmt51T9Qx7AvRzaTK0vhkTYCix2nJZn5aeubSfE_k9Nzj4SCSTyO6MscwHCydPlKsZn44Yb7AmmHIimj_lRGlFNYTVl4kwm-cSxVZJrI4dcNq2viQdpSAvM3fH9OOBM")
+	if err != nil {
+		t.Error(err)
+	}
+	encodedExtensions, err := base64.StdEncoding.DecodeString("ACgAAQAQAAAAAAAAA4QAAAAAZR3OzAACAAYABFVTLCzwAQABAfACAAEA")
+	if err != nil {
+		t.Error(err)
+	}
+	token, err := UnmarshalToken(tokenenc)
+	if err != nil {
+		t.Error(err)
+	}
+
+	verifier := blindrsa.NewRandomizedPBRSAVerifier(tokenPublicKey, crypto.SHA384)
+	err = verifier.Verify(token.AuthenticatorInput(), encodedExtensions, token.Authenticator)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 // // /////
 // // Basic issuance test vector
 // type rawBasicIssuanceTestVector struct {
